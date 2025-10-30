@@ -64,10 +64,11 @@ function ChatInterface({ thread, onUpdateTitle }) {
       }
 
       const data = await response.json();
+      console.log('Azure Search Response:', data);
       return data;
     } catch (error) {
       console.error('Azure Search error:', error);
-      return { count: 0, results: [] };
+      return { count: 0, results: [], error: error.message };
     }
   };
 
@@ -120,7 +121,17 @@ function ChatInterface({ thread, onUpdateTitle }) {
           }
         });
       } else {
-        assistantResponse = 'I searched the knowledge base but did not find specific documents matching your query. Please try rephrasing your question or ensure the Azure Search index is configured.';
+        assistantResponse = 'I searched the knowledge base but did not find specific documents matching your query.';
+
+        if (searchResults.error) {
+          assistantResponse += `\n\nError: ${searchResults.error}`;
+        }
+
+        if (searchResults.debugInfo) {
+          assistantResponse += `\n\nDebug Info:\n- Endpoint: ${searchResults.debugInfo.endpoint}\n- Index: ${searchResults.debugInfo.index}\n- Total Results: ${searchResults.debugInfo.totalResults || 0}`;
+        }
+
+        assistantResponse += '\n\nPlease check:\n1. Your Azure Search index has documents\n2. The index name is correct\n3. The search credentials are valid';
       }
 
       const assistantMessage = {

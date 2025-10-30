@@ -55,7 +55,10 @@ Deno.serve(async (req: Request) => {
     }
 
     const searchUrl = `${azureSearchEndpoint}/indexes/${azureSearchIndex}/docs/search?api-version=2023-11-01`;
-    
+
+    console.log("Search URL:", searchUrl);
+    console.log("Query:", query);
+
     const searchResponse = await fetch(searchUrl, {
       method: "POST",
       headers: {
@@ -65,19 +68,20 @@ Deno.serve(async (req: Request) => {
       body: JSON.stringify({
         search: query,
         top: top,
-        queryType: "semantic",
-        semanticConfiguration: "default",
         select: "*",
-        highlight: "content",
       }),
     });
 
     if (!searchResponse.ok) {
       const errorText = await searchResponse.text();
+      console.error("Azure Search API Error:", errorText);
       return new Response(
         JSON.stringify({
           error: "Azure Search request failed",
           details: errorText,
+          statusCode: searchResponse.status,
+          searchUrl: searchUrl,
+          indexName: azureSearchIndex,
         }),
         {
           status: searchResponse.status,
@@ -87,12 +91,18 @@ Deno.serve(async (req: Request) => {
     }
 
     const searchResults = await searchResponse.json();
+    console.log("Search results count:", searchResults.value?.length || 0);
 
     return new Response(
       JSON.stringify({
         query,
         count: searchResults.value?.length || 0,
         results: searchResults.value || [],
+        debugInfo: {
+          endpoint: azureSearchEndpoint,
+          index: azureSearchIndex,
+          totalResults: searchResults["@odata.count"],
+        },
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
