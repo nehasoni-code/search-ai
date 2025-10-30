@@ -1,0 +1,11 @@
+.app {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+@media (max-width: 768px) {
+  .app {
+    flex-direction: column;
+  }
+}
