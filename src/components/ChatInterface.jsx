@@ -47,7 +47,15 @@ function ChatInterface({ thread, onUpdateTitle }) {
             'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_SUPABASE_ANON_KEY}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ query, top: 3 }),
+          body: JSON.stringify({
+            query,
+            top: 3,
+            azureConfig: {
+              endpoint: import.meta.env.VITE_AZURE_SEARCH_ENDPOINT,
+              key: import.meta.env.VITE_AZURE_SEARCH_KEY,
+              index: import.meta.env.VITE_AZURE_SEARCH_INDEX,
+            }
+          }),
         }
       );
 

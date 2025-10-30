@@ -9,6 +9,11 @@ const corsHeaders = {
 interface SearchRequest {
   query: string;
   top?: number;
+  azureConfig?: {
+    endpoint: string;
+    key: string;
+    index: string;
+  };
 }
 
 Deno.serve(async (req: Request) => {
@@ -20,15 +25,17 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const azureSearchEndpoint = Deno.env.get("AZURE_SEARCH_ENDPOINT");
-    const azureSearchKey = Deno.env.get("AZURE_SEARCH_KEY");
-    const azureSearchIndex = Deno.env.get("AZURE_SEARCH_INDEX") || "default-index";
+    const { query, top = 5, azureConfig }: SearchRequest = await req.json();
+
+    const azureSearchEndpoint = azureConfig?.endpoint || Deno.env.get("AZURE_SEARCH_ENDPOINT");
+    const azureSearchKey = azureConfig?.key || Deno.env.get("AZURE_SEARCH_KEY");
+    const azureSearchIndex = azureConfig?.index || Deno.env.get("AZURE_SEARCH_INDEX") || "default-index";
 
     if (!azureSearchEndpoint || !azureSearchKey) {
       return new Response(
         JSON.stringify({
           error: "Azure Search credentials not configured",
-          message: "Please set AZURE_SEARCH_ENDPOINT and AZURE_SEARCH_KEY environment variables",
+          message: "Please provide Azure credentials in the request or set environment variables",
         }),
         {
           status: 500,
@@ -36,8 +43,6 @@ Deno.serve(async (req: Request) => {
         }
       );
     }
-
-    const { query, top = 5 }: SearchRequest = await req.json();
 
     if (!query) {
       return new Response(
@@ -49,7 +54,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Azure Cognitive Search API call
     const searchUrl = `${azureSearchEndpoint}/indexes/${azureSearchIndex}/docs/search?api-version=2023-11-01`;
     
     const searchResponse = await fetch(searchUrl, {
