@@ -167,11 +167,24 @@ function ChatInterface({ thread, onUpdateTitle }) {
 
         if (azureBlobResults.count > 0) {
           assistantResponse += `**Azure Blob Storage (${azureBlobResults.count} documents):**\n\n`;
-          azureBlobResults.results.slice(0, 2).forEach((result, index) => {
-            assistantResponse += `**Source ${index + 1}:**\n`;
-            if (result.content) {
-              const snippet = result.content.substring(0, 150);
-              assistantResponse += `${snippet}${result.content.length > 150 ? '...' : ''}\n\n`;
+          azureBlobResults.results.slice(0, 3).forEach((result, index) => {
+            assistantResponse += `**Document ${index + 1}:**\n`;
+
+            const fileName = result.metadata_storage_name || result.title || result.name || 'Untitled';
+            const contentField = result.content || '';
+            const score = result['@search.score'] ? ` (Relevance: ${result['@search.score'].toFixed(2)})` : '';
+
+            assistantResponse += `📄 **${fileName}**${score}\n\n`;
+
+            if (contentField) {
+              const cleanContent = contentField
+                .replace(/\n{2,}/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+              const snippet = cleanContent.substring(0, 300);
+              assistantResponse += `${snippet}${cleanContent.length > 300 ? '...' : ''}\n\n`;
+            } else {
+              assistantResponse += 'Content preview not available\n\n';
             }
           });
         }
@@ -188,7 +201,10 @@ function ChatInterface({ thread, onUpdateTitle }) {
             assistantResponse += `📄 **${fileName}**${score}\n\n`;
 
             if (contentField) {
-              const cleanContent = contentField.replace(/\n{3,}/g, '\n\n').trim();
+              const cleanContent = contentField
+                .replace(/\n{2,}/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
               const snippet = cleanContent.substring(0, 300);
               assistantResponse += `${snippet}${cleanContent.length > 300 ? '...' : ''}\n\n`;
             } else {
