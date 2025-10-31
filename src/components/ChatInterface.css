@@ -10,12 +10,50 @@
   padding: 20px 24px;
   background: white;
   border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
 }
 
 .chat-header h2 {
   font-size: 18px;
   font-weight: 600;
   color: #1a1a1a;
+  margin: 0;
+}
+
+.source-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.source-toggle label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #666;
+}
+
+.source-select {
+  padding: 6px 12px;
+  font-size: 14px;
+  border: 1px solid #d0d0d0;
+  border-radius: 6px;
+  background: white;
+  color: #1a1a1a;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.source-select:hover {
+  border-color: #0078d4;
+}
+
+.source-select:focus {
+  outline: none;
+  border-color: #0078d4;
+  box-shadow: 0 0 0 3px rgba(0, 120, 212, 0.1);
 }
 
 .empty-chat {

@@ -8,6 +8,7 @@ function ChatInterface({ thread, onUpdateTitle }) {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
+  const [searchSource, setSearchSource] = useState('sharepoint');
 
   useEffect(() => {
     if (thread) {
@@ -134,10 +135,14 @@ function ChatInterface({ thread, onUpdateTitle }) {
         onUpdateTitle(thread.id, title);
       }
 
-      const [azureBlobResults, sharePointResults] = await Promise.all([
-        searchAzure(content),
-        searchSharePoint(content)
-      ]);
+      let azureBlobResults = { count: 0, results: [] };
+      let sharePointResults = { count: 0, results: [] };
+
+      if (searchSource === 'storage') {
+        azureBlobResults = await searchAzure(content);
+      } else if (searchSource === 'sharepoint') {
+        sharePointResults = await searchSharePoint(content);
+      }
 
       const totalResults = (azureBlobResults.count || 0) + (sharePointResults.count || 0);
 
@@ -254,6 +259,18 @@ function ChatInterface({ thread, onUpdateTitle }) {
     <main className="chat-interface">
       <div className="chat-header">
         <h2>{thread.title}</h2>
+        <div className="source-toggle">
+          <label htmlFor="search-source">Search Source:</label>
+          <select
+            id="search-source"
+            value={searchSource}
+            onChange={(e) => setSearchSource(e.target.value)}
+            className="source-select"
+          >
+            <option value="sharepoint">SharePoint</option>
+            <option value="storage">Azure Blob Storage</option>
+          </select>
+        </div>
       </div>
       <MessageList messages={messages} loading={loading} />
       <MessageInput onSend={handleSendMessage} disabled={sending} />
