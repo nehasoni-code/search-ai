@@ -60,14 +60,49 @@ function ChatInterface({ thread, onUpdateTitle }) {
       );
 
       if (!response.ok) {
-        throw new Error('Search failed');
+        throw new Error('Azure Blob search failed');
       }
 
       const data = await response.json();
-      console.log('Azure Search Response:', data);
+      console.log('Azure Blob Search Response:', data);
       return data;
     } catch (error) {
-      console.error('Azure Search error:', error);
+      console.error('Azure Blob Search error:', error);
+      return { count: 0, results: [], error: error.message };
+    }
+  };
+
+  const searchSharePoint = async (query) => {
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/azure-search`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            query,
+            top: 3,
+            azureConfig: {
+              endpoint: import.meta.env.VITE_AZURE_SEARCH_ENDPOINT,
+              key: import.meta.env.VITE_AZURE_SEARCH_KEY,
+              index: import.meta.env.VITE_SHAREPOINT_SEARCH_INDEX,
+            }
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('SharePoint search failed');
+      }
+
+      const data = await response.json();
+      console.log('SharePoint Search Response:', data);
+      return data;
+    } catch (error) {
+      console.error('SharePoint Search error:', error);
       return { count: 0, results: [], error: error.message };
     }
   };
@@ -99,46 +134,77 @@ function ChatInterface({ thread, onUpdateTitle }) {
         onUpdateTitle(thread.id, title);
       }
 
-      const searchResults = await searchAzure(content);
+      const [azureBlobResults, sharePointResults] = await Promise.all([
+        searchAzure(content),
+        searchSharePoint(content)
+      ]);
+
+      const totalResults = (azureBlobResults.count || 0) + (sharePointResults.count || 0);
 
       await supabase
         .from('search_history')
         .insert([{
           thread_id: thread.id,
           query: content,
-          results_count: searchResults.count || 0,
+          results_count: totalResults,
         }]);
 
       let assistantResponse = '';
-      if (searchResults.count > 0) {
-        assistantResponse = `Based on the search results, I found ${searchResults.count} relevant document(s).\n\n`;
 
-        searchResults.results.slice(0, 3).forEach((result, index) => {
-          assistantResponse += `**Source ${index + 1}:**\n`;
-          if (result.content) {
-            const snippet = result.content.substring(0, 200);
-            assistantResponse += `${snippet}${result.content.length > 200 ? '...' : ''}\n\n`;
-          }
-        });
+      if (totalResults > 0) {
+        assistantResponse = `I found ${totalResults} relevant document(s) from your knowledge sources.\n\n`;
+
+        if (azureBlobResults.count > 0) {
+          assistantResponse += `**Azure Blob Storage (${azureBlobResults.count} documents):**\n\n`;
+          azureBlobResults.results.slice(0, 2).forEach((result, index) => {
+            assistantResponse += `**Source ${index + 1}:**\n`;
+            if (result.content) {
+              const snippet = result.content.substring(0, 150);
+              assistantResponse += `${snippet}${result.content.length > 150 ? '...' : ''}\n\n`;
+            }
+          });
+        }
+
+        if (sharePointResults.count > 0) {
+          assistantResponse += `**SharePoint (${sharePointResults.count} documents):**\n\n`;
+          sharePointResults.results.slice(0, 2).forEach((result, index) => {
+            assistantResponse += `**Document ${index + 1}:**\n`;
+            if (result.content) {
+              const snippet = result.content.substring(0, 150);
+              assistantResponse += `${snippet}${result.content.length > 150 ? '...' : ''}\n\n`;
+            }
+          });
+        }
       } else {
-        assistantResponse = 'I searched the knowledge base but did not find specific documents matching your query.';
+        assistantResponse = 'I searched your knowledge sources but did not find specific documents matching your query.';
 
-        if (searchResults.error) {
-          assistantResponse += `\n\nError: ${searchResults.error}`;
+        if (azureBlobResults.error || sharePointResults.error) {
+          assistantResponse += `\n\nErrors:\n`;
+          if (azureBlobResults.error) assistantResponse += `- Azure Blob: ${azureBlobResults.error}\n`;
+          if (sharePointResults.error) assistantResponse += `- SharePoint: ${sharePointResults.error}\n`;
         }
 
-        if (searchResults.debugInfo) {
-          assistantResponse += `\n\nDebug Info:\n- Endpoint: ${searchResults.debugInfo.endpoint}\n- Index: ${searchResults.debugInfo.index}\n- Total Results: ${searchResults.debugInfo.totalResults || 0}`;
+        if (azureBlobResults.debugInfo) {
+          assistantResponse += `\n\nAzure Blob Debug Info:\n- Endpoint: ${azureBlobResults.debugInfo.endpoint}\n- Index: ${azureBlobResults.debugInfo.index}\n- Total Results: ${azureBlobResults.debugInfo.totalResults || 0}`;
         }
 
-        assistantResponse += '\n\nPlease check:\n1. Your Azure Search index has documents\n2. The index name is correct\n3. The search credentials are valid';
+        if (sharePointResults.debugInfo) {
+          assistantResponse += `\n\nSharePoint Debug Info:\n- Endpoint: ${sharePointResults.debugInfo.endpoint}\n- Index: ${sharePointResults.debugInfo.index}\n- Total Results: ${sharePointResults.debugInfo.totalResults || 0}`;
+        }
+
+        assistantResponse += '\n\nPlease check:\n1. Your search indexes have documents\n2. The index names are correct\n3. The credentials are valid';
       }
+
+      const allSources = [
+        ...(azureBlobResults.results || []),
+        ...(sharePointResults.results || [])
+      ];
 
       const assistantMessage = {
         thread_id: thread.id,
         role: 'assistant',
         content: assistantResponse,
-        sources: searchResults.count > 0 ? searchResults.results : null,
+        sources: totalResults > 0 ? allSources : null,
       };
 
       const { data: savedAssistantMsg, error: assistantError } = await supabase
@@ -175,8 +241,8 @@ function ChatInterface({ thread, onUpdateTitle }) {
             </div>
             <div className="feature">
               <span className="feature-icon">📁</span>
-              <h3>Azure Storage</h3>
-              <p>Access files from your storage account</p>
+              <h3>Multi-Source Search</h3>
+              <p>Search across Azure Blob Storage and SharePoint</p>
             </div>
           </div>
         </div>
