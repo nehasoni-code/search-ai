@@ -178,19 +178,19 @@ function ChatInterface({ thread, onUpdateTitle }) {
 
         if (sharePointResults.count > 0) {
           assistantResponse += `**SharePoint (${sharePointResults.count} documents):**\n\n`;
-          sharePointResults.results.slice(0, 2).forEach((result, index) => {
+          sharePointResults.results.slice(0, 3).forEach((result, index) => {
             assistantResponse += `**Document ${index + 1}:**\n`;
 
-            const contentField = result.content || result.merged_content || result.text || result.body || result.description || '';
-            const titleField = result.title || result.metadata_storage_name || result.filename || 'Untitled';
+            const fileName = result.metadata_spo_item_name || result.title || 'Untitled';
+            const contentField = result.content || result.merged_content || '';
+            const score = result['@search.score'] ? ` (Relevance: ${result['@search.score'].toFixed(2)})` : '';
 
-            if (titleField && titleField !== 'Untitled') {
-              assistantResponse += `Title: ${titleField}\n`;
-            }
+            assistantResponse += `📄 **${fileName}**${score}\n\n`;
 
             if (contentField) {
-              const snippet = contentField.substring(0, 200);
-              assistantResponse += `${snippet}${contentField.length > 200 ? '...' : ''}\n\n`;
+              const cleanContent = contentField.replace(/\n{3,}/g, '\n\n').trim();
+              const snippet = cleanContent.substring(0, 300);
+              assistantResponse += `${snippet}${cleanContent.length > 300 ? '...' : ''}\n\n`;
             } else {
               assistantResponse += 'Content preview not available\n\n';
             }
