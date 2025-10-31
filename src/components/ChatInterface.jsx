@@ -101,6 +101,12 @@ function ChatInterface({ thread, onUpdateTitle }) {
 
       const data = await response.json();
       console.log('SharePoint Search Response:', data);
+
+      if (data.results && data.results.length > 0) {
+        console.log('SharePoint First Result Fields:', Object.keys(data.results[0]));
+        console.log('SharePoint First Result:', data.results[0]);
+      }
+
       return data;
     } catch (error) {
       console.error('SharePoint Search error:', error);
@@ -174,9 +180,19 @@ function ChatInterface({ thread, onUpdateTitle }) {
           assistantResponse += `**SharePoint (${sharePointResults.count} documents):**\n\n`;
           sharePointResults.results.slice(0, 2).forEach((result, index) => {
             assistantResponse += `**Document ${index + 1}:**\n`;
-            if (result.content) {
-              const snippet = result.content.substring(0, 150);
-              assistantResponse += `${snippet}${result.content.length > 150 ? '...' : ''}\n\n`;
+
+            const contentField = result.content || result.merged_content || result.text || result.body || result.description || '';
+            const titleField = result.title || result.metadata_storage_name || result.filename || 'Untitled';
+
+            if (titleField && titleField !== 'Untitled') {
+              assistantResponse += `Title: ${titleField}\n`;
+            }
+
+            if (contentField) {
+              const snippet = contentField.substring(0, 200);
+              assistantResponse += `${snippet}${contentField.length > 200 ? '...' : ''}\n\n`;
+            } else {
+              assistantResponse += 'Content preview not available\n\n';
             }
           });
         }
